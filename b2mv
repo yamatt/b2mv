@@ -2,20 +2,95 @@
 set -euo pipefail
 
 # Usage:
-#   b2mv <source-bucket> <old-file-name> <destination-bucket> <new-file-name>
-# Example (rename in same bucket):
-#   b2mv my-bucket old/path/file.txt my-bucket new/path/file.txt
-# Example (move across buckets):
-#   b2mv source-bucket file.txt dest-bucket archive/file.txt
+#   b2mv <bucket> <old-path> <new-path>
+# Examples:
+#   b2mv my-bucket old/path/file.txt new/path/file.txt  # Move single file
+#   b2mv my-bucket old/dir/ new/dir/                    # Move entire directory
+#   b2mv my-bucket documents/ archive/2023/documents/   # Move directory to new location
+
+show_usage() {
+    echo "Usage: $0 <bucket> <old-path> <new-path>"
+    echo ""
+    echo "Examples:"
+    echo "  Single file: $0 my-bucket file.txt renamed-file.txt"
+    echo "  Directory:   $0 my-bucket old/dir/ new/dir/"
+    echo "  Move dir:    $0 my-bucket docs/ archive/2023/docs/"
+    echo ""
+    echo "Note: Use trailing slash for directories"
+}
 
 if [ "$#" -ne 3 ]; then
-    echo "Usage: $0 <source-bucket> <old-file-name> <new-file-name>"
+    show_usage
     exit 1
 fi
 
 SRC_BUCKET="$1"
-OLD_FILE="$2"
-NEW_FILE="$3"
+OLD_PATH="$2"
+NEW_PATH="$3"
 
-b2 file server-side-copy "b2://$SRC_BUCKET/$OLD_FILE" "b2://$SRC_BUCKET/$NEW_FILE"
-b2 rm "b2://$SRC_BUCKET/$OLD_FILE"
+# Function to move a single file
+move_file() {
+    local old_file="$1"
+    local new_file="$2"
+
+    echo "Moving: $old_file -> $new_file"
+
+    # Perform server-side copy
+    if ! b2 file server-side-copy "b2://$SRC_BUCKET/$old_file" "b2://$SRC_BUCKET/$new_file"; then
+        echo "Error: Failed to copy $old_file to $new_file" >&2
+        return 1
+    fi
+
+    # Remove original file
+    if ! b2 rm "b2://$SRC_BUCKET/$old_file"; then
+        echo "Error: Failed to remove original file $old_file" >&2
+        echo "Warning: Copy succeeded but cleanup failed. You may have a duplicate file." >&2
+        return 1
+    fi
+}
+
+# Check if OLD_PATH ends with slash (directory operation)
+if [[ "$OLD_PATH" == */ ]]; then
+    echo "Directory operation detected. Listing files in directory: $OLD_PATH"
+
+    # List all files with the prefix
+    files=$(b2 ls --recursive --versions "$SRC_BUCKET" "$OLD_PATH" | grep -v "^$OLD_PATH$" | awk '{print $4}' | grep -v "/$")
+
+    if [ -z "$files" ]; then
+        echo "No files found in directory: $OLD_PATH"
+        exit 0
+    fi
+
+    # Count total files for progress tracking
+    total_files=$(echo "$files" | wc -l)
+    echo "Found $total_files files to move"
+
+    # Process each file
+    current=1
+    while IFS= read -r file; do
+        # Skip empty lines
+        [ -z "$file" ] && continue
+
+        # Calculate the relative path from the old directory
+        relative_path="${file#$OLD_PATH}"
+
+        # Construct the new file path
+        new_file="$NEW_PATH$relative_path"
+
+        echo "[$current/$total_files] Processing: $file"
+
+        if ! move_file "$file" "$new_file"; then
+            echo "Error: Failed to move $file" >&2
+            exit 1
+        fi
+
+        ((current++))
+    done <<< "$files"
+
+    echo "Successfully moved all files from $OLD_PATH to $NEW_PATH"
+
+else
+    # Single file operation
+    echo "Single file operation: $OLD_PATH -> $NEW_PATH"
+    move_file "$OLD_PATH" "$NEW_PATH"
+fi

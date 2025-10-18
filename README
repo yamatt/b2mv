@@ -1,10 +1,18 @@
 # b2mv
 
-A simple command-line utility for moving and renaming files in Backblaze B2 cloud storage.
+A simple command-line utility for moving and renaming files and directories in Backblaze B2 cloud storage.
 
 ## Description
 
-`b2mv` provides a convenient way to move or rename files within Backblaze B2 buckets using server-side operations. It performs a server-side copy followed by deletion of the original file, similar to how the `mv` command works in Unix-like systems.
+`b2mv` provides a convenient way to move or rename files and entire directories within Backblaze B2 buckets using server-side operations. It performs server-side copy followed by deletion of the original files, similar to how the `mv` command works in Unix-like systems.
+
+## Features
+
+- **Single file operations**: Move or rename individual files
+- **Directory operations**: Move entire directories with all their contents
+- **Server-side operations**: Efficient transfers without downloading/uploading
+- **Progress tracking**: Shows progress when moving multiple files
+- **Error handling**: Robust error handling with clear messages
 
 ## Prerequisites
 
@@ -27,18 +35,20 @@ A simple command-line utility for moving and renaming files in Backblaze B2 clou
 ## Usage
 
 ```bash
-b2mv <bucket> <old-file-name> <new-file-name>
+b2mv <bucket> <old-path> <new-path>
 ```
 
 ### Parameters
 
-- `bucket`: The name of the B2 bucket containing the file
-- `old-file-name`: The current path/name of the file in the bucket
-- `new-file-name`: The new path/name for the file in the same bucket
+- `bucket`: The name of the B2 bucket containing the files
+- `old-path`: The current path/name of the file or directory in the bucket
+- `new-path`: The new path/name for the file or directory in the same bucket
+
+**Important**: Use trailing slashes (`/`) for directory operations.
 
 ### Examples
 
-**Rename a file:**
+**Rename a single file:**
 
 ```bash
 b2mv my-bucket old-name.txt new-name.txt
@@ -50,33 +60,79 @@ b2mv my-bucket old-name.txt new-name.txt
 b2mv my-bucket file.txt archive/file.txt
 ```
 
+**Move an entire directory:**
+
+```bash
+b2mv my-bucket old-directory/ new-directory/
+```
+
+**Move a directory to a new location:**
+
+```bash
+b2mv my-bucket documents/ archive/2023/documents/
+```
+
 **Rename and move simultaneously:**
 
 ```bash
 b2mv my-bucket documents/report.pdf backups/2023/annual-report.pdf
 ```
 
+**Reorganize directory structure:**
+
+```bash
+b2mv my-bucket temp-uploads/ processed/batch-2023-10/
+```
+
 ## How It Works
 
-The script performs two operations:
+### Single File Operations
+
+For single files, the script performs two operations:
 
 1. **Server-side copy**: Creates a copy of the file at the new location using `b2 file server-side-copy`
 2. **Delete original**: Removes the original file using `b2 rm`
 
-This approach is efficient as it doesn't require downloading and re-uploading the file - the copy operation happens entirely on Backblaze's servers.
+### Directory Operations
+
+For directories (indicated by trailing slash), the script:
+
+1. **Lists all files**: Uses `b2 ls --recursive` to find all files in the source directory
+2. **Processes each file**: Iterates through each file and performs the move operation
+3. **Progress tracking**: Shows current progress (file X of Y)
+4. **Preserves structure**: Maintains the relative directory structure in the destination
+
+## Directory Operation Details
+
+- **Detection**: Directory operations are detected by a trailing slash (`/`) in the source path
+- **Recursive**: All files and subdirectories are moved recursively
+- **Structure preservation**: The relative path structure is maintained in the destination
+- **Progress feedback**: Shows which file is being processed and overall progress
+- **Error handling**: If any file fails to move, the operation stops with an error
 
 ## Error Handling
 
-The script includes error handling to:
+The script includes comprehensive error handling to:
 
 - Validate that exactly 3 arguments are provided
 - Exit immediately if any command fails (due to `set -euo pipefail`)
+- Handle copy failures without removing the original file
+- Provide clear error messages for debugging
+- Track progress and show which operations succeed or fail
+
+## Performance Considerations
+
+- **Server-side operations**: All copy operations happen on Backblaze servers
+- **No data transfer**: Files are not downloaded/uploaded, saving bandwidth and time
+- **Sequential processing**: Files are moved one at a time to avoid overwhelming the API
+- **Data transfer costs**: Server-side copy operations within the same region are typically free
 
 ## Notes
 
-- **Data transfer costs**: Server-side copy operations within the same region are typically free
-- **Atomic operation**: If the copy fails, the original file remains untouched
+- **Atomic operation**: If a copy fails, the original file remains untouched
 - **File metadata**: Server-side copy preserves file metadata including timestamps and custom headers
+- **Directory syntax**: Always use trailing slashes for directory operations
+- **Large directories**: For very large directories, the operation may take some time but will show progress
 
 ## License
 
