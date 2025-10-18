@@ -2,22 +2,41 @@
 set -euo pipefail
 
 # Usage:
-#   b2mv <bucket> <old-path> <new-path>
+#   b2mv [--dry-run] <bucket> <old-path> <new-path>
 # Examples:
 #   b2mv my-bucket old/path/file.txt new/path/file.txt  # Move single file
 #   b2mv my-bucket old/dir/ new/dir/                    # Move entire directory
 #   b2mv my-bucket documents/ archive/2023/documents/   # Move directory to new location
+#   b2mv --dry-run my-bucket old/dir/ new/dir/          # Preview operations without executing
 
 show_usage() {
-    echo "Usage: $0 <bucket> <old-path> <new-path>"
+    echo "Usage: $0 [--dry-run] <bucket> <old-path> <new-path>"
+    echo ""
+    echo "Options:"
+    echo "  --dry-run    Show what would be done without executing"
     echo ""
     echo "Examples:"
     echo "  Single file: $0 my-bucket file.txt renamed-file.txt"
     echo "  Directory:   $0 my-bucket old/dir/ new/dir/"
     echo "  Move dir:    $0 my-bucket docs/ archive/2023/docs/"
+    echo "  Preview:     $0 --dry-run my-bucket old/dir/ new/dir/"
     echo ""
     echo "Note: Use trailing slash for directories"
 }
+
+# Parse command line arguments
+DRY_RUN=false
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --dry-run)
+            DRY_RUN=true
+            shift
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
 
 if [ "$#" -ne 3 ]; then
     show_usage
@@ -32,6 +51,11 @@ NEW_PATH="$3"
 move_file() {
     local old_file="$1"
     local new_file="$2"
+
+    if [ "$DRY_RUN" = true ]; then
+        echo "[DRY RUN] Would move: $old_file -> $new_file"
+        return 0
+    fi
 
     echo "Moving: $old_file -> $new_file"
 
@@ -70,6 +94,13 @@ if [[ "$OLD_PATH" == */ ]]; then
     while IFS= read -r file; do
         # Skip empty lines
         [ -z "$file" ] && continue
+
+        # skip .bzEmpty files
+        if [[ "$file" == *.bzEmpty ]]; then
+            echo "Skipping empty placeholder file: $file"
+            ((current++))
+            continue
+        fi
 
         # Calculate the relative path from the old directory
         relative_path="${file#$OLD_PATH}"
