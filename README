@@ -1,0 +1,87 @@
+# b2mv
+
+A simple command-line utility for moving and renaming files in Backblaze B2 cloud storage.
+
+## Description
+
+`b2mv` provides a convenient way to move or rename files within Backblaze B2 buckets using server-side operations. It performs a server-side copy followed by deletion of the original file, similar to how the `mv` command works in Unix-like systems.
+
+## Prerequisites
+
+- [Backblaze B2 CLI](https://www.backblaze.com/b2/docs/tool_installation.html) must be installed and configured
+- Valid B2 account credentials configured via `b2 authorize-account`
+
+## Installation
+
+1. Make the script executable:
+
+   ```bash
+   chmod +x b2mv
+   ```
+
+2. Optionally, move it to a directory in your PATH:
+   ```bash
+   sudo mv b2mv /usr/local/bin/
+   ```
+
+## Usage
+
+```bash
+b2mv <bucket> <old-file-name> <new-file-name>
+```
+
+### Parameters
+
+- `bucket`: The name of the B2 bucket containing the file
+- `old-file-name`: The current path/name of the file in the bucket
+- `new-file-name`: The new path/name for the file in the same bucket
+
+### Examples
+
+**Rename a file:**
+
+```bash
+b2mv my-bucket old-name.txt new-name.txt
+```
+
+**Move a file to a different directory within the same bucket:**
+
+```bash
+b2mv my-bucket file.txt archive/file.txt
+```
+
+**Rename and move simultaneously:**
+
+```bash
+b2mv my-bucket documents/report.pdf backups/2023/annual-report.pdf
+```
+
+## How It Works
+
+The script performs two operations:
+
+1. **Server-side copy**: Creates a copy of the file at the new location using `b2 file server-side-copy`
+2. **Delete original**: Removes the original file using `b2 rm`
+
+This approach is efficient as it doesn't require downloading and re-uploading the file - the copy operation happens entirely on Backblaze's servers.
+
+## Error Handling
+
+The script includes error handling to:
+
+- Validate that exactly 3 arguments are provided
+- Exit immediately if any command fails (due to `set -euo pipefail`)
+
+## Notes
+
+- **Data transfer costs**: Server-side copy operations within the same region are typically free
+- **Atomic operation**: If the copy fails, the original file remains untouched
+- **File metadata**: Server-side copy preserves file metadata including timestamps and custom headers
+
+## License
+
+See the LICENSE file for details.
+
+## Contributing
+
+Feel free to submit issues and pull requests to improve this utility.

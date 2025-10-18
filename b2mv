@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Usage:
+#   b2mv <source-bucket> <old-file-name> <destination-bucket> <new-file-name>
+# Example (rename in same bucket):
+#   b2mv my-bucket old/path/file.txt my-bucket new/path/file.txt
+# Example (move across buckets):
+#   b2mv source-bucket file.txt dest-bucket archive/file.txt
+
+if [ "$#" -ne 3 ]; then
+    echo "Usage: $0 <source-bucket> <old-file-name> <new-file-name>"
+    exit 1
+fi
+
+SRC_BUCKET="$1"
+OLD_FILE="$2"
+NEW_FILE="$3"
+
+b2 file server-side-copy "b2://$SRC_BUCKET/$OLD_FILE" "b2://$SRC_BUCKET/$NEW_FILE"
+b2 rm "b2://$SRC_BUCKET/$OLD_FILE"
