@@ -54,7 +54,7 @@ if [[ "$OLD_PATH" == */ ]]; then
     echo "Directory operation detected. Listing files in directory: $OLD_PATH"
 
     # List all files with the prefix
-    files=$(b2 ls --recursive --versions "$SRC_BUCKET" "$OLD_PATH" | grep -v "^$OLD_PATH$" | awk '{print $4}' | grep -v "/$")
+    files=$(b2 ls --recursive --versions "b2://$SRC_BUCKET/$OLD_PATH" | grep -v "^$OLD_PATH$" | awk '{print $4}' | grep -v "/$")
 
     if [ -z "$files" ]; then
         echo "No files found in directory: $OLD_PATH"
